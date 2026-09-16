@@ -199,13 +199,14 @@ jobs:
             echo "HAVE_SOURCE_BOOT_IMAGE=true" >> $GITHUB_ENV
         fi
 
-    - name: Setup KernelSU
+    - name: Setup ReSukiSU
       if: env.ENABLE_KERNELSU == 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
+        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
         KSU_VERSION=$(cd KernelSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
-        echo "UPLOADNAME=-KernelSU_$KSU_VERSION" >> $GITHUB_ENV
+        echo "UPLOADNAME=-ReSukiSU_$KSU_VERSION" >> $GITHUB_ENV
+        echo "KERNELSU_TAG=${{ env.KERNELSU_TAG }}" >> $GITHUB_ENV
 
     - name: Setup Configuration for Kernel
       run: |
@@ -222,8 +223,34 @@ jobs:
             if grep -q "CONFIG_KSU" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
                 sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
                 sed -i 's/CONFIG_KSU=n/CONFIG_KSU=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/# CONFIG_KSU_MANUAL_HOOK is not set/CONFIG_KSU_MANUAL_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU_MANUAL_HOOK=n/CONFIG_KSU_MANUAL_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             else
                 echo "CONFIG_KSU=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            fi
+            if grep -q "CONFIG_KSU_MANUAL_HOOK" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
+                sed -i 's/# CONFIG_KSU_MANUAL_HOOK is not set/CONFIG_KSU_MANUAL_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU_MANUAL_HOOK=n/CONFIG_KSU_MANUAL_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            else
+                echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            fi
+            if grep -q "CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
+                sed -i 's/# CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK is not set/CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=n/CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            else
+                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            fi
+            if grep -q "CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
+                sed -i 's/# CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK is not set/CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=n/CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            else
+                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            fi
+            if grep -q "CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
+                sed -i 's/# CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK is not set/CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=n/CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            else
+                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             fi
         fi
         if [ ${{ env.ADD_KPROBES_CONFIG }} = true -a ${{ env.APPLY_KSU_PATCH }} != true ]; then
