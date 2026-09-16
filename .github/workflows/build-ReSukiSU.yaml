@@ -204,7 +204,6 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
         curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
-        # 获取 ReSukiSU 版本号用于压缩包命名
         KSU_VERSION=$(cd KernelSU 2>/dev/null && expr $(/usr/bin/git rev-list --count HEAD) + 10200 || echo "ReSukiSU")
         echo "UPLOADNAME=-ReSukiSU_$KSU_VERSION" >> $GITHUB_ENV
 
@@ -251,19 +250,7 @@ jobs:
             with open(path, "w") as f: f.write(content)
         EOF
         
-        # 4. drivers/input/input.c Hook
-        python3 - << 'EOF'
-        path = "drivers/input/input.c"
-        with open(path) as f: content = f.read()
-        if "ksu_handle_input_handle_event" not in content:
-            decl = "#ifdef CONFIG_KSU_MANUAL_HOOK\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif\n\n"
-            anchor = "void input_event(struct input_dev *dev,\n\t\t unsigned int type, unsigned int code, int value)\n{\n\tunsigned long flags;\n"
-            hook = "\n#ifdef CONFIG_KSU_MANUAL_HOOK\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n"
-            content = content.replace(anchor, decl + anchor + hook, 1)
-            with open(path, "w") as f: f.write(content)
-        EOF
-        
-        # 5. fs/open.c Hook
+        # 4. fs/open.c Hook
         python3 - << 'EOF'
         path = "fs/open.c"
         with open(path) as f: content = f.read()
@@ -275,7 +262,7 @@ jobs:
             with open(path, "w") as f: f.write(content)
         EOF
         
-        # 6. fs/stat.c Hook
+        # 5. fs/stat.c Hook
         python3 - << 'EOF'
         path = "fs/stat.c"
         with open(path) as f: content = f.read()
@@ -303,13 +290,16 @@ jobs:
         # --- 修复内核版本号字符串及启用自动哈希后缀逻辑结束 ---
 
         if [ ${{ env.ENABLE_KERNELSU }} = true ]; then
-            # ReSukiSU 核心配置注入
+            # ReSukiSU 修复通信必需的核心配置注入
             echo "CONFIG_KSU=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             echo "CONFIG_KALLSYMS_ALL=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KSU_SUSFS=n" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
         fi
 
-        # 以下保留原版脚本应对非 KSU 场景的基础逻辑
         if [ ${{ env.APPLY_KSU_PATCH }} = true ]; then
             bash $GITHUB_WORKSPACE/patches/patches.sh
         fi
