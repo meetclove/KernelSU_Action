@@ -210,6 +210,13 @@ jobs:
     - name: Setup Configuration for Kernel
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+        
+        # --- 修复内核版本号字符串及启用自动哈希后缀逻辑开始 ---
+        sed -i 's/CONFIG_LOCALVERSION=".*"/CONFIG_LOCALVERSION="-perf"/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        sed -i 's/# CONFIG_LOCALVERSION_AUTO is not set/CONFIG_LOCALVERSION_AUTO=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        grep -q "CONFIG_LOCALVERSION_AUTO=y" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }} || echo "CONFIG_LOCALVERSION_AUTO=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        # --- 修复内核版本号字符串及启用自动哈希后缀逻辑结束 ---
+
         if [ ${{ env.APPLY_KSU_PATCH }} = true ]; then
             bash $GITHUB_WORKSPACE/patches/patches.sh
             if grep -q "CONFIG_KSU" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
