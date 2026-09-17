@@ -1,5 +1,6 @@
 #!/bin/bash
 # ReSukiSU manual hook patches for non-GKI kernel (gauguin 4.19)
+# Based on ReSukiSU setup.sh method
 # Required hooks: fs/stat.c, fs/exec.c, fs/open.c, kernel/reboot.c
 # Config macro: CONFIG_KSU_MANUAL_HOOK
 
@@ -21,6 +22,7 @@ for i in "${patch_files[@]}"; do
 
     # fs/stat.c - stat/fstat/fstatat hooks
     fs/stat.c)
+        # Hook newfstatat
         if grep -q "SYSCALL_DEFINE4(newfstatat" "$i"; then
             sed -i '/SYSCALL_DEFINE4(newfstatat/i\
 #ifdef CONFIG_KSU_MANUAL_HOOK\
@@ -36,6 +38,7 @@ extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **sta
 \tksu_handle_stat(&dfd, &filename, &flag);\
 #endif' "$i"
         fi
+        # Hook newfstat (32-bit)
         if grep -q "SYSCALL_DEFINE2(newfstat" "$i"; then
             sed -i '/SYSCALL_DEFINE2(newfstat/,/return error;/{/return error;/i\
 #ifdef CONFIG_KSU_MANUAL_HOOK\
@@ -43,6 +46,7 @@ extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **sta
 #endif
             }' "$i"
         fi
+        # Hook fstat64 (32-bit)
         if grep -q "SYSCALL_DEFINE2(fstat64" "$i"; then
             sed -i '/SYSCALL_DEFINE2(fstat64/,/return error;/{/return error;/i\
 #ifdef CONFIG_KSU_MANUAL_HOOK // for 32-bit\
@@ -50,6 +54,7 @@ extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **sta
 #endif
             }' "$i"
         fi
+        # Hook fstatat64 (32-bit)
         if grep -q "SYSCALL_DEFINE4(fstatat64" "$i"; then
             sed -i '/SYSCALL_DEFINE4(fstatat64/i\
 #ifdef CONFIG_KSU_MANUAL_HOOK\
@@ -66,18 +71,20 @@ extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *fla
 
     # fs/exec.c - execve hooks
     fs/exec.c)
-        sed -i '/int do_execve(struct filename \*filename/i\
+        # Hook do_execve
+        sed -i '/int do_execve(struct filename \\*filename/i\
 #ifdef CONFIG_KSU_MANUAL_HOOK\
 __attribute__((hot))\
 extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr,\
 \t\t\tvoid *argv, void *envp, int *flags);\
 #endif' "$i"
-        sed -i '/int do_execve(struct filename \*filename/,/return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);/{/struct user_arg_ptr envp = { .ptr.native = __envp };/a\
+        sed -i '/int do_execve(struct filename \\*filename/,/return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);/{/struct user_arg_ptr envp = { .ptr.native = __envp };/a\
 #ifdef CONFIG_KSU_MANUAL_HOOK\
 \tksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);\
 #endif
         }' "$i"
-        sed -i '/static int compat_do_execve(struct filename \*filename/,/return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);/{/\.ptr.compat = __envp,/a\
+        # Hook compat_do_execve (32-bit)
+        sed -i '/static int compat_do_execve(struct filename \\*filename/,/return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);/{/\.ptr.compat = __envp,/a\
 #ifdef CONFIG_KSU_MANUAL_HOOK // 32-bit ksud and 32-on-64 support\
 \tksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);\
 #endif
