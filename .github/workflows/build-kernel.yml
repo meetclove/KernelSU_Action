@@ -199,45 +199,32 @@ jobs:
             echo "HAVE_SOURCE_BOOT_IMAGE=true" >> $GITHUB_ENV
         fi
 
-    - name: Setup ReSukiSU
+    - name: Setup KernelSU
       if: env.ENABLE_KERNELSU == 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
         KSU_VERSION=$(cd KernelSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
-        echo "UPLOADNAME=-ReSukiSU_$KSU_VERSION" >> $GITHUB_ENV
-
-    - name: ReSukiSU manual hook patches
-      if: env.ENABLE_KERNELSU == 'true'
-      run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        bash $GITHUB_WORKSPACE/patches/patches.sh
+        echo "UPLOADNAME=-KernelSU_$KSU_VERSION" >> $GITHUB_ENV
 
     - name: Setup Configuration for Kernel
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        
-        # --- 修复内核版本号字符串及启用自动哈希后缀逻辑 ---
-        sed -i 's/CONFIG_LOCALVERSION=".*"/CONFIG_LOCALVERSION="-perf"/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-        sed -i 's/# CONFIG_LOCALVERSION_AUTO is not set/CONFIG_LOCALVERSION_AUTO=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-        grep -q "CONFIG_LOCALVERSION_AUTO=y" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }} || echo "CONFIG_LOCALVERSION_AUTO=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-
-        # --- ReSukiSU (manual hook) defconfig + seccomp filter fix ---
-        if [ ${{ env.ENABLE_KERNELSU }} = true ]; then
-            {
-                echo "# --- ReSukiSU (manual hook) ---"
-                echo "CONFIG_KSU=y"
-                echo "CONFIG_KSU_MANUAL_HOOK=y"
-                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK=y"
-                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y"
-                echo "CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y"
-                echo "CONFIG_SECCOMP=y"
-                echo "CONFIG_SECCOMP_FILTER=y"
-            } >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-            echo "--- ReSukiSU defconfig fragment + seccomp filter 已添加 ---"
-            grep -E "CONFIG_KSU=|CONFIG_KSU_MANUAL_HOOK|CONFIG_SECCOMP" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        if [ ${{ env.APPLY_KSU_PATCH }} = true ]; then
+            bash $GITHUB_WORKSPACE/patches/patches.sh
+            if grep -q "CONFIG_KSU" arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}; then
+                sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+                sed -i 's/CONFIG_KSU=n/CONFIG_KSU=y/g' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            else
+                echo "CONFIG_KSU=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            fi
         fi
-
+        if [ ${{ env.ADD_KPROBES_CONFIG }} = true -a ${{ env.APPLY_KSU_PATCH }} != true ]; then
+            echo "CONFIG_MODULES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KPROBES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_HAVE_KPROBES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_KPROBE_EVENTS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        fi
         if [ ${{ env.ADD_OVERLAYFS_CONFIG }} = true ]; then
             echo "CONFIG_OVERLAY_FS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
         fi
